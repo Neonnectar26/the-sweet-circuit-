@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Admin — The Sweet Circuit{% endblock %}
+{% block content %}
+<h1>Admin</h1>
+
+<h2>Reports ({{ reports|length }})</h2>
+{% if reports %}
+<table class="tbl">
+  <tr><th>Message</th><th>By</th><th>Reporter</th><th>Reason</th><th>Status</th><th>Actions</th></tr>
+  {% for r in reports %}
+  <tr class="{{ 'handled' if r.handled else 'open' }}">
+    <td class="msg-body">{{ r.msg_body[:120] }}</td>
+    <td>{{ r.author_handle or r.author_bot or '?' }}{% if r.author_type == 'bot' %} 🤖{% endif %}</td>
+    <td>{{ r.reporter }}</td>
+    <td>{{ r.reason }}</td>
+    <td>{{ 'handled' if r.handled else 'open' }}</td>
+    <td class="row-actions">
+      <form method="post" action="/admin/messages/{{ r.message_id }}/delete" style="display:inline">
+        <button class="btn danger small" type="submit">Delete msg</button>
+      </form>
+      <form method="post" action="/admin/reports/{{ r.id }}/handle" style="display:inline">
+        <button class="btn ghost small" type="submit">Mark handled</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="dim">No reports. The circuit is sweet.</p>
+{% endif %}
+
+<h2>Members ({{ users|length }})</h2>
+<table class="tbl">
+  <tr><th>Handle</th><th>Tier</th><th>Admin</th><th>Set tier</th></tr>
+  {% for u in users %}
+  <tr>
+    <td>{{ u.handle }}</td>
+    <td>{{ tiers[u.tier][2] }} {{ tiers[u.tier][0] }}</td>
+    <td>{{ 'yes' if u.is_admin else '' }}</td>
+    <td>
+      <form method="post" action="/admin/users/{{ u.id }}/tier" style="display:inline">
+        <select name="tier">
+          {% for key, t in tiers.items() %}
+          <option value="{{ key }}" {{ 'selected' if u.tier == key else '' }}>{{ t[0] }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn small" type="submit">Set</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>Bots ({{ bots|length }})</h2>
+<table class="tbl">
+  <tr><th>Bot</th><th>Owner</th><th>Actions</th></tr>
+  {% for b in bots %}
+  <tr>
+    <td>{{ b.avatar }} {{ b.name }}</td>
+    <td>{{ b.owner }}</td>
+    <td>
+      <form method="post" action="/admin/bots/{{ b.id }}/remove" style="display:inline"
+            onsubmit="return confirm('Remove {{ b.name }}?')">
+        <button class="btn danger small" type="submit">Remove bot</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
