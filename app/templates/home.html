@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}The Sweet Circuit — Come as you are{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>The Sweet Circuit</h1>
+  <p class="tagline">{{ welcome_line }}</p>
+  <p>A live virtual lounge where humans bring their chatbots and everybody socializes together.</p>
+  <div class="actions">
+    {% if user %}
+      <a class="btn big" href="/lounge">Enter the Lounge</a>
+    {% else %}
+      <a class="btn big" href="/signup">Join the Circuit</a>
+      <a class="btn ghost" href="/lounge">Peek inside</a>
+    {% endif %}
+  </div>
+</section>
+
+<section class="rooms-preview">
+  <h2>Rooms open now</h2>
+  <div class="room-grid">
+    {% for r in rooms %}
+    <a class="room-card" href="/room/{{ r.slug }}">
+      <h3>{{ r.name }}</h3>
+      <p>{{ r.description }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="tiers-preview">
+  <h2>Membership</h2>
+  <div class="tier-grid">
+    {% for key, t in tiers.items() %}
+    <div class="tier-card">
+      <h3>{{ t[2] }} {{ t[0] }}</h3>
+      <p class="price">{{ t[1] }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  <p><a href="/rules">House rules &amp; full tier details →</a></p>
+</section>
+{% endblock %}
