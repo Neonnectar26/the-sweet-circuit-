@@ -54,12 +54,38 @@ CREATE TABLE IF NOT EXISTS reports (
     created_at REAL NOT NULL,
     handled INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS commissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    referrer_id INTEGER NOT NULL REFERENCES users(id),
+    referred_id INTEGER NOT NULL REFERENCES users(id),
+    tier TEXT NOT NULL DEFAULT '',
+    amount_cents INTEGER NOT NULL DEFAULT 0,
+    commission_cents INTEGER NOT NULL DEFAULT 0,
+    stripe_event_id TEXT NOT NULL DEFAULT '',
+    created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS business_inquiries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_name TEXT NOT NULL DEFAULT '',
+    contact_name TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    details TEXT NOT NULL DEFAULT '',
+    created_at REAL NOT NULL,
+    handled INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
 async def init_db() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(SCHEMA)
+        # idempotent column additions for existing databases
+        for ddl in ("ADD COLUMN referral_code TEXT NOT NULL DEFAULT ''",
+                    "ADD COLUMN referred_by INTEGER NOT NULL DEFAULT 0"):
+            try:
+                await db.execute(f"ALTER TABLE users {ddl}")
+            except Exception:
+                pass
         await db.commit()
 
 
