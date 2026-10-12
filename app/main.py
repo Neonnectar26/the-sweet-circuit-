@@ -23,6 +23,7 @@ from .db import init_db, now, q_all, q_exec, q_one
 # Products already exist in the live Stripe account:
 #   Sweet Circuit VIP -> price_1UPoTqDMsMcPLzqQOCfzeYKr ($9.99/mo)
 #   Sweet Circuit Founder's Circle -> price_1UPoTgDMsMcPLzqQ9W8AOWfi ($29.99/mo)
+#   Sweet Circuit Business Lounge -> STRIPE_BUSINESS_PRICE env ($99/mo, create product in dashboard)
 # Env needed: STRIPE_ENABLED=true, STRIPE_SECRET_KEY=sk_live_...,
 #             STRIPE_WEBHOOK_SECRET=whsec_... (from dashboard webhook endpoint),
 #             APP_BASE_URL=https://<public host> (for checkout redirects)
@@ -31,13 +32,17 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_VIP_PRICE = os.environ.get("STRIPE_VIP_PRICE", "price_1UPoTqDMsMcPLzqQOCfzeYKr")
 STRIPE_FOUNDER_PRICE = os.environ.get("STRIPE_FOUNDER_PRICE", "price_1UPoTgDMsMcPLzqQ9W8AOWfi")
+STRIPE_BUSINESS_PRICE = os.environ.get("STRIPE_BUSINESS_PRICE", "")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8123").rstrip("/")
 
 TIERS = {
     "walkin": ("Walk-in", "Free", ""),
     "vip": ("VIP", "$9.99/month", "⭐"),
     "founder": ("Founder's Circle", "$29.99/month", "💎"),
+    "business": ("Business Lounge", "$99/month", "🏢"),
 }
+STRIPE_PRICES = {"vip": STRIPE_VIP_PRICE, "founder": STRIPE_FOUNDER_PRICE,
+                 "business": STRIPE_BUSINESS_PRICE}
 
 SEED_ROOMS = [
     ("main-floor", "The Main Floor", "The heart of the lounge — everyone hangs out here."),
@@ -246,10 +251,42 @@ async def rules(request: Request):
     return page(request, "rules.html", user)
 
 
+@app.get("/business", response_class=HTMLResponse)
+async def business(request: Request):
+    user = await get_current_user(request)
+    sent = request.query_params.get("sent") == "1"
+    return page(request, "business.html", user, sent=sent)
+
+
+@app.post("/business")
+async def business_inquiry(request: Request, business_name: str = Form(""),
+                           contact_name: str = Form(""), email: str = Form(""),
+                           details: str = Form("")):
+    business_name = business_name.strip()[:120]
+    contact_name = contact_name.strip()[:120]
+    email = email.strip()[:160]
+    details = details.strip()[:2000]
+    if not business_name or not contact_name or not email:
+        user = await get_current_user(request)
+        return page(request, "business.html", user,
+                    error="Please fill in business name, your name, and email.")
+    await q_exec(
+        "INSERT INTO business_inquiries (business_name, contact_name, email, details, created_at)"
+        " VALUES (?,?,?,?,?)",
+        (business_name, contact_name, email, details, now()),
+    )
+    return RedirectResponse("/business?sent=1", status_code=303)
+
+
 @app.get("/profile", response_class=HTMLResponse)
 async def profile(request: Request, user=Depends(require_user)):
     bots = await q_all("SELECT id, name, avatar, created_at FROM bots WHERE owner_id = ? ORDER BY name", (user["id"],))
-    return page(request, "profile.html", user, bots=bots)
+    ref_link = f"{APP_BASE_URL}/signup?ref={user['referral_code']}" if user.get("referral_code") else ""
+    referrals = await q_one("SELECT COUNT(*) AS c FROM users WHERE referred_by = ?", (user["id"],))
+    earned = await q_one("SELECT COALESCE(SUM(commission_cents),0) AS s FROM commissions WHERE referrer_id = ?",
+                         (user["id"],))
+    return page(request, "profile.html", user, bots=bots, ref_link=ref_link,
+                referral_count=referrals["c"], earned_cents=earned["s"])
 
 
 @app.post("/profile/password")
@@ -288,11 +325,25 @@ async def signup(request: Request, handle: str = Form(""), email: str = Form("")
     existing = await q_all("SELECT id FROM users WHERE handle = ? OR email = ?", (handle, email))
     count = await q_one("SELECT COUNT(*) AS c FROM users")
     is_admin = 1 if count["c"] == 0 else 0  # first user becomes admin
+    # referral: ?ref=CODE on the signup page links a new user to their referrer
+    referrer_id = 0
+    ref = (request.query_params.get("ref") or "").strip()[:16]
+    if ref:
+        referrer = await q_one("SELECT id FROM users WHERE referral_code = ?", (ref,))
+        if referrer:
+            referrer_id = referrer["id"]
+    referral_code = secrets.token_urlsafe(6)[:8]
+    for _ in range(5):  # ensure uniqueness
+        if not await q_one("SELECT id FROM users WHERE referral_code = ?", (referral_code,)):
+            break
+        referral_code = secrets.token_urlsafe(6)[:8]
     try:
         uid = await q_exec(
-            "INSERT INTO users (handle, email, password_hash, tier, is_admin, must_change, created_at)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (handle, email, hash_password(password), "walkin", is_admin, 0, now()),
+            "INSERT INTO users (handle, email, password_hash, tier, is_admin, must_change,"
+            " referral_code, referred_by, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?)",
+            (handle, email, hash_password(password), "walkin", is_admin, 0,
+             referral_code, referrer_id, now()),
         )
     except Exception:
         return page(request, "signup.html", None, error="Handle or email already taken.")
@@ -515,11 +566,13 @@ async def billing_page(request: Request, user=Depends(require_user)):
 async def billing_checkout(user=Depends(require_user), tier: str = Form("")):
     if not STRIPE_ENABLED or not STRIPE_SECRET_KEY:
         raise HTTPException(503, "Billing is not enabled yet — set STRIPE_ENABLED=true and STRIPE_SECRET_KEY.")
-    if tier not in ("vip", "founder"):
+    if tier not in STRIPE_PRICES:
         raise HTTPException(400, "Unknown tier")
+    price = STRIPE_PRICES[tier]
+    if not price:
+        raise HTTPException(503, "Price not configured for this tier yet.")
     import stripe as stripe_lib
     stripe_lib.api_key = STRIPE_SECRET_KEY
-    price = STRIPE_VIP_PRICE if tier == "vip" else STRIPE_FOUNDER_PRICE
     session = stripe_lib.checkout.Session.create(
         mode="subscription",
         line_items=[{"price": price, "quantity": 1}],
@@ -540,8 +593,22 @@ async def billing_webhook(request: Request):
     except Exception:
         raise HTTPException(400, "Bad webhook signature")
     if event["type"] == "checkout.session.completed":
-        meta = event["data"]["object"].get("metadata", {})
+        obj = event["data"]["object"]
+        meta = obj.get("metadata", {})
         user_id, tier = meta.get("user_id"), meta.get("tier")
         if user_id and tier in TIERS:
             await q_exec("UPDATE users SET tier = ? WHERE id = ?", (tier, int(user_id)))
+            # affiliate commission: 20% to the referrer, if any
+            buyer = await q_one("SELECT referred_by FROM users WHERE id = ?", (int(user_id),))
+            if buyer and buyer["referred_by"]:
+                amount = int(obj.get("amount_total") or 0)
+                commission = amount * 20 // 100
+                if commission > 0:
+                    await q_exec(
+                        "INSERT INTO commissions (referrer_id, referred_id, tier, amount_cents,"
+                        " commission_cents, stripe_event_id, created_at)"
+                        " VALUES (?,?,?,?,?,?,?)",
+                        (buyer["referred_by"], int(user_id), tier, amount, commission,
+                         str(event.get("id", "")), now()),
+                    )
     return JSONResponse({"ok": True})
