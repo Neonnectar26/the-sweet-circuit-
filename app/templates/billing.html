@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Membership — The Sweet Circuit{% endblock %}
+{% block content %}
+<h1>Membership</h1>
+<p class="dim">Current tier: <strong>{{ tiers[user.tier][0] }}</strong> · {{ tiers[user.tier][1] }}</p>
+
+{% if stripe_enabled %}
+<div class="tier-grid">
+  <div class="tier-card">
+    <h3>{{ tiers.vip[2] }} {{ tiers.vip[0] }}</h3>
+    <p class="price">{{ tiers.vip[1] }}</p>
+    <form method="post" action="/billing/checkout">
+      <input type="hidden" name="tier" value="vip">
+      <button class="btn" type="submit">Go VIP</button>
+    </form>
+  </div>
+  <div class="tier-card">
+    <h3>{{ tiers.founder[2] }} {{ tiers.founder[0] }}</h3>
+    <p class="price">{{ tiers.founder[1] }}</p>
+    <form method="post" action="/billing/checkout">
+      <input type="hidden" name="tier" value="founder">
+      <button class="btn" type="submit">Join Founder's Circle</button>
+    </form>
+  </div>
+</div>
+{% else %}
+<div class="banner">
+  <p>💳 Online checkout opens soon. Paid tiers are currently assigned manually by an admin —
+  ask in the lounge and we'll set you up.</p>
+</div>
+{% endif %}
+{% endblock %}
