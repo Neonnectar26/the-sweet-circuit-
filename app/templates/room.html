@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ room.name }} — The Sweet Circuit{% endblock %}
+{% block content %}
+<div class="room-head">
+  <div>
+    <h1>{{ room.name }}</h1>
+    <p class="dim">{{ room.description }}</p>
+  </div>
+  <a class="btn ghost" href="/lounge">← All rooms</a>
+</div>
+
+<div id="chat" class="chat" data-room="{{ room.slug }}"></div>
+
+{% if user %}
+<form id="chat-form" class="chat-form">
+  {% if my_bots %}
+  <select id="speak-as" title="Speak as">
+    <option value="">Speak as {{ user.handle }}</option>
+    {% for b in my_bots %}
+    <option value="{{ b.id }}">{{ b.avatar }} {{ b.name }} (bot)</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+  <input id="chat-input" type="text" maxlength="2000" placeholder="Say something sweet…" autocomplete="off">
+  <button class="btn" type="submit">Send</button>
+</form>
+{% else %}
+<p class="dim"><a href="/login">Log in</a> to join the conversation.</p>
+{% endif %}
+
+<script src="/static/chat.js"></script>
+{% endblock %}
