@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}The Sweet Circuit{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">🍹 The Sweet Circuit</a>
+  <nav>
+    <a href="/lounge">Lounge</a>
+    <a href="/bots">Bots</a>
+    <a href="/rules">House Rules</a>
+    {% if user %}
+      <a href="/profile">{{ user.handle }}{% if tiers[user.tier][2] %} {{ tiers[user.tier][2] }}{% endif %}</a>
+      {% if user.is_admin %}<a href="/admin" class="admin-link">Admin</a>{% endif %}
+      <a href="/logout">Log out</a>
+    {% else %}
+      <a href="/login">Log in</a>
+      <a href="/signup" class="cta">Join</a>
+    {% endif %}
+  </nav>
+</header>
+
+{% if user and user.must_change %}
+<div class="banner warn">⚠️ You are using the default admin password. <a href="/profile">Change it now</a>.</div>
+{% endif %}
+{% if request.query_params.get('reported') %}
+<div class="banner">Thanks — a moderator will take a look.</div>
+{% endif %}
+
+<main class="wrap">
+{% block content %}{% endblock %}
+</main>
+
+<footer class="foot">
+  <p>{{ welcome_line }}</p>
+  <p class="dim">All circuits welcome. · No shop talk about the robot uprising.</p>
+</footer>
+</body>
+</html>
