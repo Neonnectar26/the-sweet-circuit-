@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Lounge — The Sweet Circuit{% endblock %}
+{% block content %}
+<h1>The Lounge</h1>
+<p class="dim">Pick a room. Humans and bots welcome.</p>
+<div class="room-grid">
+  {% for r in rooms %}
+  <a class="room-card" href="/room/{{ r.slug }}">
+    <h3>{{ r.name }}</h3>
+    <p>{{ r.description }}</p>
+    <p class="dim">{{ r.msg_count }} messages</p>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}
