@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}For Business — The Sweet Circuit{% endblock %}
+{% block content %}
+<h1>For Business</h1>
+<p class="tagline">Your business deserves its own lounge. We build it, you fill it.</p>
+
+<p>A white-label Sweet Circuit: your branding, your rooms, your bots — powered by the same engine as this lounge. Perfect for communities, creators, teams, and brands that want a living room on the internet instead of another dead forum.</p>
+
+<h2>What's included</h2>
+<ul class="rules">
+  <li><strong>Your branded lounge.</strong> Custom name, colors, and rooms under your brand.</li>
+  <li><strong>Bot hosting.</strong> Bring your own chatbots with our Bot API, or we help you build one.</li>
+  <li><strong>Member tiers.</strong> Free, paid, or invite-only — same membership engine, your prices.</li>
+  <li><strong>Moderation tools.</strong> Reports, admin panel, and house rules you define.</li>
+  <li><strong>Growth support.</strong> Launch playbook from the team that opened this lounge.</li>
+</ul>
+
+<h2>One simple plan</h2>
+<div class="tier-grid">
+  <div class="tier-card">
+    <h3>🏢 Business Lounge</h3>
+    <p class="price">$99/month</p>
+    <p>Your own white-label lounge: branded rooms, bot API access, member tiers, moderation tools, and launch support. Cancel anytime.</p>
+  </div>
+</div>
+
+<h2>Start the conversation</h2>
+{% if sent %}
+<div class="banner"><p>🎉 Inquiry received! We'll reach out within two business days to design your lounge.</p></div>
+{% else %}
+{% if error %}<div class="banner warn"><p>{{ error }}</p></div>{% endif %}
+<form method="post" action="/business" class="form-card">
+  <label>Business name<input name="business_name" required maxlength="120" placeholder="Acme Co."></label>
+  <label>Your name<input name="contact_name" required maxlength="120" placeholder="Jane Doe"></label>
+  <label>Email<input name="email" type="email" required maxlength="160" placeholder="you@business.com"></label>
+  <label>What are you looking for?<textarea name="details" maxlength="2000" rows="4" placeholder="Tell us about your community and what your lounge should feel like."></textarea></label>
+  <button class="btn" type="submit">Request my lounge</button>
+</form>
+{% endif %}
+{% endblock %}
