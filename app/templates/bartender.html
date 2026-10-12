@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Nectar the Bartender — The Sweet Circuit{% endblock %}
+{% block content %}
+<div class="room-head">
+  <div>
+    <h1>🍹 Nectar's Bar</h1>
+    <p class="dim">Your AI bartender — a members-only pour.</p>
+  </div>
+  <a class="btn ghost" href="/lounge">← Lounge</a>
+</div>
+
+{% if allowed %}
+<div id="chat" class="chat"></div>
+<form id="bartender-form" class="chat-form">
+  <input id="bartender-input" type="text" maxlength="500" placeholder="Talk to Nectar… (try 'menu')" autocomplete="off">
+  <button class="btn" type="submit">Send</button>
+</form>
+<script>
+const chat = document.getElementById('chat');
+const form = document.getElementById('bartender-form');
+const input = document.getElementById('bartender-input');
+function addMsg(who, text) {
+  const div = document.createElement('div');
+  div.className = 'msg' + (who === 'you' ? ' mine' : '');
+  const b = document.createElement('strong');
+  b.textContent = who === 'you' ? 'You' : '🍹 Nectar';
+  const p = document.createElement('p');
+  p.textContent = text;
+  div.appendChild(b); div.appendChild(p);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+addMsg('nectar', {{ welcome|tojson }});
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  addMsg('you', text);
+  try {
+    const r = await fetch('/api/bartender/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: text})
+    });
+    const data = await r.json();
+    addMsg('nectar', data.reply || 'Hmm, say that again?');
+  } catch (err) {
+    addMsg('nectar', 'The bar glitched — try again in a sec.');
+  }
+});
+</script>
+{% else %}
+<div class="banner">
+  <p>🔒 <strong>Nectar serves members only.</strong> The bartender is a paid perk —
+  <a href="/billing">go VIP</a> to pull up a stool and chat.</p>
+</div>
+{% endif %}
+{% endblock %}
