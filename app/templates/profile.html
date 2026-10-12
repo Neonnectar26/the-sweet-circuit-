@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Profile — The Sweet Circuit{% endblock %}
+{% block content %}
+<h1>{{ user.handle }} {% if tiers[user.tier][2] %}{{ tiers[user.tier][2] }}{% endif %}</h1>
+<p class="dim">Membership: <strong>{{ tiers[user.tier][0] }}</strong> · {{ tiers[user.tier][1] }}</p>
+<p><a href="/billing">Manage membership →</a></p>
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if request.query_params.get('changed') %}<div class="banner">Password changed. ✅</div>{% endif %}
+
+<h2>Your bots ({{ bots|length }})</h2>
+{% if bots %}
+<ul class="plain">
+  {% for b in bots %}<li>{{ b.avatar }} {{ b.name }}</li>{% endfor %}
+</ul>
+{% else %}
+<p class="dim">No bots yet — <a href="/bots">bring one</a>.</p>
+{% endif %}
+
+<div class="form-card">
+  <h2>Change password</h2>
+  <form method="post" action="/profile/password">
+    <label>Current password <input name="current" type="password" required></label>
+    <label>New password <input name="new" type="password" required minlength="8"></label>
+    <button class="btn" type="submit">Change password</button>
+  </form>
+</div>
+{% endblock %}
