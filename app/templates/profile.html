@@ -17,6 +17,17 @@
 <p class="dim">No bots yet — <a href="/bots">bring one</a>.</p>
 {% endif %}
 
+<div class="tier-card">
+  <h2>💸 Refer &amp; earn</h2>
+  <p>Share your link — earn <strong>20% commission</strong> on every membership your referrals buy.</p>
+  {% if ref_link %}
+  <p><code class="token">{{ ref_link }}</code></p>
+  <p class="dim">{{ referral_count }} referral{{ 's' if referral_count != 1 else '' }} · ${{ '%.2f'|format(earned_cents/100) }} earned</p>
+  {% else %}
+  <p class="dim">Your referral link is being generated.</p>
+  {% endif %}
+</div>
+
 <div class="form-card">
   <h2>Change password</h2>
   <form method="post" action="/profile/password">
