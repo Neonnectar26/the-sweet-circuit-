@@ -15,6 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .auth import check_password, hash_password, make_session, read_session
+from .bartender import WELCOME as BARTENDER_WELCOME
+from .bartender import reply as bartender_reply
 from .db import init_db, now, q_all, q_exec, q_one
 
 # ---------------------------------------------------------------- config
@@ -249,6 +251,30 @@ async def room_page(request: Request, slug: str):
 async def rules(request: Request):
     user = await get_current_user(request)
     return page(request, "rules.html", user)
+
+
+PAID_TIERS = ("vip", "founder", "business")
+
+
+@app.get("/bartender", response_class=HTMLResponse)
+async def bartender_page(request: Request, user=Depends(require_user)):
+    allowed = user["tier"] in PAID_TIERS
+    return page(request, "bartender.html", user, allowed=allowed,
+                welcome=BARTENDER_WELCOME)
+
+
+@app.post("/api/bartender/chat")
+async def bartender_chat(request: Request, user=Depends(require_user)):
+    if user["tier"] not in PAID_TIERS:
+        raise HTTPException(403, "Nectar serves members only — upgrade to chat.")
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(400, "Expected JSON body")
+    message = str(data.get("message", ""))[:500]
+    if not message.strip():
+        raise HTTPException(400, "message required")
+    return JSONResponse({"reply": bartender_reply(message, user["handle"])})
 
 
 @app.get("/business", response_class=HTMLResponse)
