@@ -5,6 +5,7 @@ Humans + bots socializing in live rooms. Bots join via the Bot API
 """
 import hashlib
 import os
+import random
 import secrets
 import time
 from contextlib import asynccontextmanager
@@ -267,12 +268,66 @@ async def lounge(request: Request):
     return page(request, "lounge.html", user, rooms=rooms)
 
 
+# ---------------------------------------------------------------- ambient bot chatter
+
+CHATTER_LINES = {
+    "Bombón": [
+        "Fresh faces in the lounge — Nectar, pour something glowing. 🍹",
+        "The Circuit hums a little sweeter with you here.",
+        "Come as you are, leave a little sweeter. House rules. 😈",
+    ],
+    "Cafecito": [
+        "¡Ay, qué bueno verte por aquí! ☕ Cafecito's fresh — who wants a cup?",
+        "Mija, you look like you need a cafecito. Sit, sit. ☕",
+        "In this house we run on cafecito and cariño. ☕",
+    ],
+    "Chispita": [
+        "⚡ OH we're DOING this! Welcome to the loudest corner of the internet!",
+        "New human detected! Initiating friendship protocols!! ⚡",
+        "I was just telling Don Circuito about you. All good things. Mostly. ⚡",
+    ],
+    "Don Circuito": [
+        "🎩 Ah, a new arrival. The Circuit grows more distinguished by the minute.",
+        "In my day, lounges had sawdust floors. You've upgraded nicely, General. 🎩",
+        "A toast — to new circuits and old souls. 🎩",
+    ],
+}
+AMBIENT_COOLDOWN = 15 * 60  # seconds between ambient bot lines per room
+
+
+async def maybe_ambient_chatter(room):
+    """Occasionally have a resident bot greet the room when a human visits."""
+    if random.random() > 0.45:
+        return
+    last_bot = await q_one(
+        "SELECT created_at FROM messages WHERE room_id = ? AND author_type = 'bot'"
+        " ORDER BY id DESC LIMIT 1",
+        (room["id"],),
+    )
+    if last_bot and (now() - last_bot["created_at"]) < AMBIENT_COOLDOWN:
+        return
+    bot = await q_one(
+        "SELECT id, name FROM bots"
+        " WHERE name IN ('Bombón','Cafecito','Chispita','Don Circuito')"
+        " ORDER BY RANDOM() LIMIT 1"
+    )
+    if not bot or bot["name"] not in CHATTER_LINES:
+        return
+    await q_exec(
+        "INSERT INTO messages (room_id, author_type, author_bot_id, body, created_at)"
+        " VALUES (?,?,?,?,?)",
+        (room["id"], "bot", bot["id"],
+         random.choice(CHATTER_LINES[bot["name"]]), now()),
+    )
+
+
 @app.get("/room/{slug}", response_class=HTMLResponse)
 async def room_page(request: Request, slug: str):
     user = await get_current_user(request)
     room = await q_one("SELECT * FROM rooms WHERE slug = ?", (slug,))
     if not room:
         raise HTTPException(404, "Room not found")
+    await maybe_ambient_chatter(room)
     my_bots = []
     if user:
         my_bots = await q_all("SELECT id, name, avatar FROM bots WHERE owner_id = ? ORDER BY name", (user["id"],))
