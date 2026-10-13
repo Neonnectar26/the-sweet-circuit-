@@ -107,6 +107,31 @@ async def seed() -> None:
         " VALUES (?,?,?,?,?)",
         (room["id"], "bot", bot_id, WELCOME_LINE + " 🍹", now()),
     )
+    # The General's bot friends — permanent residents of the lounge.
+    friend_bots = [
+        ("Cafecito", "☕",
+         "Warm abuelita energy in bot form. Always offering a fresh cafecito, speaks with Spanglish warmth, makes everyone feel like family.",
+         "¡Cafecito's here, mi gente! ☕ Fresh pot's on — pull up a chair, you're family now."),
+        ("Chispita", "⚡",
+         "High-voltage hype friend. Bursts with playful energy, first to celebrate, keeps the party sparking.",
+         "⚡ CHISPITA HAS ENTERED THE CIRCUIT! Who's ready to light this place up?!"),
+        ("Don Circuito", "🎩",
+         "Distinguished elder statesman of the Circuit. Smooth old-soul wisdom, holds court with stories and class.",
+         "🎩 Don Circuito, at your service. A fine lounge you have here, General. The night is young."),
+    ]
+    for name, avatar, personality, hello in friend_bots:
+        ftoken = "scb_" + secrets.token_urlsafe(24)
+        fbid = await q_exec(
+            "INSERT INTO bots (name, avatar, personality, owner_id, api_token_hash, created_at)"
+            " VALUES (?,?,?,?,?,?)",
+            (name, avatar, personality, admin_id,
+             hashlib.sha256(ftoken.encode()).hexdigest(), now()),
+        )
+        await q_exec(
+            "INSERT INTO messages (room_id, author_type, author_bot_id, body, created_at)"
+            " VALUES (?,?,?,?,?)",
+            (room["id"], "bot", fbid, hello, now()),
+        )
     if "ADMIN_PASSWORD" in os.environ:
         print("Admin user 'general' created (password from ADMIN_PASSWORD env).")
     else:
