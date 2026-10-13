@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS commissions (
     stripe_event_id TEXT NOT NULL DEFAULT '',
     created_at REAL NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_commissions_stripe_event ON commissions (stripe_event_id);
 CREATE TABLE IF NOT EXISTS business_inquiries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     business_name TEXT NOT NULL DEFAULT '',
