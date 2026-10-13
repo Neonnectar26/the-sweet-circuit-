@@ -6,6 +6,7 @@ Humans + bots socializing in live rooms. Bots join via the Bot API
 import hashlib
 import os
 import secrets
+import time
 from contextlib import asynccontextmanager
 from http.cookies import SimpleCookie
 
@@ -83,10 +84,13 @@ async def seed() -> None:
     admin = await q_one("SELECT * FROM users WHERE handle = 'general'")
     if admin:
         return
+    # Password survives redeploys: set ADMIN_PASSWORD in Render env once.
+    # Falls back to the default only if the env var is missing.
+    admin_pw = os.environ.get("ADMIN_PASSWORD", "sweetcircuit1")
     admin_id = await q_exec(
         "INSERT INTO users (handle, email, password_hash, tier, is_admin, must_change, created_at)"
         " VALUES (?,?,?,?,?,?,?)",
-        ("general", "general@sweetcircuit.lounge", hash_password("sweetcircuit1"),
+        ("general", "general@sweetcircuit.lounge", hash_password(admin_pw),
          "founder", 1, 1, now()),
     )
     token = secrets.token_urlsafe(32)
@@ -103,7 +107,10 @@ async def seed() -> None:
         " VALUES (?,?,?,?,?)",
         (room["id"], "bot", bot_id, WELCOME_LINE + " 🍹", now()),
     )
-    print("⚠️  Admin user 'general' created with default password 'sweetcircuit1' — CHANGE IT on first login!")
+    if "ADMIN_PASSWORD" in os.environ:
+        print("Admin user 'general' created (password from ADMIN_PASSWORD env).")
+    else:
+        print("⚠️  Admin user 'general' created with default password 'sweetcircuit1' — CHANGE IT on first login!")
 
 
 # ---------------------------------------------------------------- helpers
@@ -378,6 +385,27 @@ async def signup(request: Request, handle: str = Form(""), email: str = Form("")
     return resp
 
 
+# ---------------------------------------------------------------- login rate limit
+# Simple in-memory sliding window: 8 failed attempts per IP per 10 minutes.
+# No new dependencies; resets on redeploy (acceptable for a throttle).
+_LOGIN_ATTEMPTS: dict[str, list[float]] = {}
+_LOGIN_MAX = 8
+_LOGIN_WINDOW = 600.0
+
+
+def _login_allowed(ip: str) -> bool:
+    now_t = time.monotonic()
+    hits = [t for t in _LOGIN_ATTEMPTS.get(ip, []) if now_t - t < _LOGIN_WINDOW]
+    _LOGIN_ATTEMPTS[ip] = hits
+    if len(_LOGIN_ATTEMPTS) > 5000:  # keep the table bounded
+        _LOGIN_ATTEMPTS.clear()
+    return len(hits) < _LOGIN_MAX
+
+
+def _login_record(ip: str) -> None:
+    _LOGIN_ATTEMPTS.setdefault(ip, []).append(time.monotonic())
+
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_form(request: Request):
     return page(request, "login.html", None)
@@ -385,8 +413,13 @@ async def login_form(request: Request):
 
 @app.post("/login")
 async def login(request: Request, handle: str = Form(""), password: str = Form("")):
+    ip = request.client.host if request.client else "?"
+    if not _login_allowed(ip):
+        return page(request, "login.html", None,
+                    error="Too many tries — wait a few minutes and try again.")
     user = await q_one("SELECT * FROM users WHERE handle = ?", (handle.strip(),))
     if not user or not check_password(password, user["password_hash"]):
+        _login_record(ip)
         return page(request, "login.html", None, error="Wrong handle or password.")
     resp = RedirectResponse("/lounge", status_code=303)
     resp.set_cookie("sc_session", make_session(user["id"]), httponly=True, max_age=30 * 24 * 3600, samesite="lax")
@@ -630,11 +663,20 @@ async def billing_webhook(request: Request):
                 amount = int(obj.get("amount_total") or 0)
                 commission = amount * 20 // 100
                 if commission > 0:
-                    await q_exec(
-                        "INSERT INTO commissions (referrer_id, referred_id, tier, amount_cents,"
-                        " commission_cents, stripe_event_id, created_at)"
-                        " VALUES (?,?,?,?,?,?,?)",
-                        (buyer["referred_by"], int(user_id), tier, amount, commission,
-                         str(event.get("id", "")), now()),
+                    # Idempotency: Stripe retries this webhook if the app was napping
+                    # (Render free tier sleeps after 15 min idle). Never pay twice for
+                    # the same Stripe event.
+                    event_id = str(event.get("id", ""))
+                    dup = await q_one(
+                        "SELECT id FROM commissions WHERE stripe_event_id = ?",
+                        (event_id,),
                     )
+                    if not dup:
+                        await q_exec(
+                            "INSERT INTO commissions (referrer_id, referred_id, tier, amount_cents,"
+                            " commission_cents, stripe_event_id, created_at)"
+                            " VALUES (?,?,?,?,?,?,?)",
+                            (buyer["referred_by"], int(user_id), tier, amount, commission,
+                             event_id, now()),
+                        )
     return JSONResponse({"ok": True})
