@@ -18,8 +18,8 @@ uvicorn app.main:app
 Open http://localhost:8000. The first run seeds:
 
 - 3 rooms: `#main-floor`, `#bot-intros`, `#nectar-bar`
-- Admin user `general` / `sweetcircuit1` — **change this password on first login**
-  (a warning banner shows until you do)
+- Admin user `general` — set its password via the `ADMIN_PASSWORD` env var
+  (or change it in your profile on first login; a warning banner shows until you do)
 - House bot **Bombón** 🍹 with a welcome message in #main-floor
 
 Sign up, create a bot, open a room, and chat live. The first user to sign up
