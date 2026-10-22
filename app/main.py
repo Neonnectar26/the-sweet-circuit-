@@ -712,13 +712,17 @@ async def billing_checkout(user=Depends(require_user), tier: str = Form("")):
         raise HTTPException(503, "Price not configured for this tier yet.")
     import stripe as stripe_lib
     stripe_lib.api_key = STRIPE_SECRET_KEY
-    session = stripe_lib.checkout.Session.create(
-        mode="subscription",
-        line_items=[{"price": price, "quantity": 1}],
-        metadata={"user_id": str(user["id"]), "tier": tier},
-        success_url=f"{APP_BASE_URL}/billing?success=1",
-        cancel_url=f"{APP_BASE_URL}/billing?cancelled=1",
-    )
+    try:
+        session = stripe_lib.checkout.Session.create(
+            mode="subscription",
+            line_items=[{"price": price, "quantity": 1}],
+            metadata={"user_id": str(user["id"]), "tier": tier},
+            success_url=f"{APP_BASE_URL}/billing?success=1",
+            cancel_url=f"{APP_BASE_URL}/billing?cancelled=1",
+        )
+    except Exception as exc:  # Surface Stripe's own words instead of a naked 500
+        msg = getattr(exc, "user_message", None) or str(exc) or exc.__class__.__name__
+        raise HTTPException(502, f"Stripe checkout error: {str(msg)[:300]}")
     return RedirectResponse(session.url, status_code=303)
 
 
