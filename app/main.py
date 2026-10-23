@@ -38,6 +38,7 @@ STRIPE_VIP_PRICE = os.environ.get("STRIPE_VIP_PRICE", "price_1UPoTqDMsMcPLzqQOCf
 STRIPE_FOUNDER_PRICE = os.environ.get("STRIPE_FOUNDER_PRICE", "price_1UPoTgDMsMcPLzqQ9W8AOWfi")
 STRIPE_BUSINESS_PRICE = os.environ.get("STRIPE_BUSINESS_PRICE", "")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8123").rstrip("/")
+SHOPIFY_STORE_URL = os.environ.get("SHOPIFY_STORE_URL", "https://x0qwut-sa.myshopify.com").rstrip("/")
 
 TIERS = {
     "walkin": ("Walk-in", "Free", ""),
@@ -244,7 +245,7 @@ hub = RoomHub()
 
 
 def page(request: Request, template: str, user=None, **ctx):
-    ctx.update({"request": request, "user": user, "tiers": TIERS, "welcome_line": WELCOME_LINE})
+    ctx.update({"request": request, "user": user, "tiers": TIERS, "welcome_line": WELCOME_LINE, "shop_url": SHOPIFY_STORE_URL})
     return templates.TemplateResponse(template, ctx)
 
 

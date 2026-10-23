@@ -39,4 +39,12 @@
   </div>
   <p><a href="/rules">House rules &amp; full tier details →</a></p>
 </section>
+
+{% if shop_url %}
+<section class="shop-preview">
+  <h2>🛍️ The Merch Shop</h2>
+  <p>The official drip lives in our store — starting with the <strong>Neon Nectar tee</strong>. Have a Neon Nectar and chill!!</p>
+  <p><a class="btn big" href="{{ shop_url }}" target="_blank" rel="noopener">Shop the store →</a></p>
+</section>
+{% endif %}
 {% endblock %}
